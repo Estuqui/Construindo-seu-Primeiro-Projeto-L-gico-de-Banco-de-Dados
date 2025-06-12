@@ -1,0 +1,138 @@
+-- Script SQL para criação do esquema
+
+CREATE TABLE Cliente (
+    id_cliente INT PRIMARY KEY AUTO_INCREMENT,
+    nome VARCHAR(100) NOT NULL,
+    tipo CHAR(2) NOT NULL CHECK (tipo IN ('PF', 'PJ')),
+    cpf VARCHAR(14) UNIQUE,
+    cnpj VARCHAR(18) UNIQUE,
+    CONSTRAINT chk_cliente_pf_pj CHECK (
+        (tipo = 'PF' AND cpf IS NOT NULL AND cnpj IS NULL) OR
+        (tipo = 'PJ' AND cnpj IS NOT NULL AND cpf IS NULL)
+    )
+);
+
+CREATE TABLE Fornecedor (
+    id_fornecedor INT PRIMARY KEY AUTO_INCREMENT,
+    nome VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE Vendedor (
+    id_vendedor INT PRIMARY KEY AUTO_INCREMENT,
+    nome VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE Produto (
+    id_produto INT PRIMARY KEY AUTO_INCREMENT,
+    nome VARCHAR(100) NOT NULL,
+    descricao TEXT,
+    preco DECIMAL(10,2) NOT NULL
+);
+
+CREATE TABLE Produto_Fornecedor (
+    id_produto INT,
+    id_fornecedor INT,
+    PRIMARY KEY (id_produto, id_fornecedor),
+    FOREIGN KEY (id_produto) REFERENCES Produto(id_produto),
+    FOREIGN KEY (id_fornecedor) REFERENCES Fornecedor(id_fornecedor)
+);
+
+CREATE TABLE Pagamento (
+    id_pagamento INT PRIMARY KEY AUTO_INCREMENT,
+    id_cliente INT,
+    tipo VARCHAR(50),
+    dados VARCHAR(255),
+    FOREIGN KEY (id_cliente) REFERENCES Cliente(id_cliente)
+);
+
+CREATE TABLE Entrega (
+    id_entrega INT PRIMARY KEY AUTO_INCREMENT,
+    status VARCHAR(50),
+    codigo_rastreio VARCHAR(50)
+);
+
+CREATE TABLE Pedido (
+    id_pedido INT PRIMARY KEY AUTO_INCREMENT,
+    id_cliente INT,
+    data_pedido DATE,
+    id_pagamento INT,
+    id_entrega INT,
+    FOREIGN KEY (id_cliente) REFERENCES Cliente(id_cliente),
+    FOREIGN KEY (id_pagamento) REFERENCES Pagamento(id_pagamento),
+    FOREIGN KEY (id_entrega) REFERENCES Entrega(id_entrega)
+);
+
+CREATE TABLE Estoque (
+    id_estoque INT PRIMARY KEY AUTO_INCREMENT,
+    id_produto INT,
+    quantidade INT,
+    FOREIGN KEY (id_produto) REFERENCES Produto(id_produto)
+);
+
+
+-- Inserção de dados
+
+-- Clientes
+INSERT INTO Cliente (nome, tipo, cpf) VALUES ('Ana Silva', 'PF', '123.456.789-00');
+INSERT INTO Cliente (nome, tipo, cnpj) VALUES ('Empresa XYZ', 'PJ', '12.345.678/0001-99');
+
+-- Fornecedores e vendedores
+INSERT INTO Fornecedor (nome) VALUES ('Fornecedor A');
+INSERT INTO Vendedor (nome) VALUES ('Vendedor X');
+
+-- Produto e relacionamento com fornecedor
+INSERT INTO Produto (nome, descricao, preco) VALUES ('Caneta', 'Caneta azul', 2.50);
+INSERT INTO Produto_Fornecedor (id_produto, id_fornecedor) VALUES (1, 1);
+
+-- Pagamento
+INSERT INTO Pagamento (id_cliente, tipo, dados) VALUES (1, 'Cartão de Crédito', 'Visa **** 1234');
+
+-- Entrega
+INSERT INTO Entrega (status, codigo_rastreio) VALUES ('Enviado', 'BR123456789');
+
+-- Pedido
+INSERT INTO Pedido (id_cliente, data_pedido, id_pagamento, id_entrega) VALUES (1, '2025-05-30', 1, 1);
+
+-- Estoque
+INSERT INTO Estoque (id_produto, quantidade) VALUES (1, 100);
+
+-- Pergunta: Quantos pedidos foram feitos por cada cliente?
+
+SELECT c.nome, COUNT(p.id_pedido) AS total_pedidos
+FROM Cliente c
+LEFT JOIN Pedido p ON c.id_cliente = p.id_cliente
+GROUP BY c.id_cliente, c.nome
+ORDER BY total_pedidos DESC;
+
+-- Pergunta: Algum vendedor também é fornecedor?
+
+SELECT v.nome
+FROM Vendedor v
+INNER JOIN Fornecedor f ON v.nome = f.nome;
+
+-- Relação de produtos, fornecedores e estoque
+
+SELECT p.nome AS produto, f.nome AS fornecedor, e.quantidade AS estoque
+FROM Produto p
+INNER JOIN Produto_Fornecedor pf ON p.id_produto = pf.id_produto
+INNER JOIN Fornecedor f ON pf.id_fornecedor = f.id_fornecedor
+LEFT JOIN Estoque e ON p.id_produto = e.id_produto
+ORDER BY p.nome;
+
+-- Relação de nomes dos fornecedores e nomes dos produtos
+
+SELECT f.nome AS fornecedor, p.nome AS produto
+FROM Fornecedor f
+INNER JOIN Produto_Fornecedor pf ON f.id_fornecedor = pf.id_fornecedor
+INNER JOIN Produto p ON pf.id_produto = p.id_produto
+ORDER BY f.nome, p.nome;
+
+-- Total gasto por cliente (considerando preço dos produtos)
+
+SELECT c.nome, SUM(pp.quantidade * pr.preco) AS total_gasto
+FROM Cliente c
+JOIN Pedido p ON c.id_cliente = p.id_cliente
+JOIN Pedido_Produto pp ON p.id_pedido = pp.id_pedido
+JOIN Produto pr ON pp.id_produto = pr.id_produto
+GROUP BY c.id_cliente, c.nome
+ORDER BY total_gasto DESC;
